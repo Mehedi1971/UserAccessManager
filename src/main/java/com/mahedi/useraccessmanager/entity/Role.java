@@ -20,7 +20,4 @@ public class Role {
     private UUID id;
 
     private String name;
-
-//    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-//    private Set<User> users;
 }

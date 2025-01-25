@@ -2,14 +2,12 @@ package com.mahedi.useraccessmanager.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
 
-@Setter
-@Getter
+import lombok.*;
+
+@Data
 @AllArgsConstructor
+@NoArgsConstructor
 @Builder
 public class Response {
 

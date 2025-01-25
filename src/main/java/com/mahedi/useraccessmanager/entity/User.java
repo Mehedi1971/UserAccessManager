@@ -24,9 +24,11 @@ public class User {
 
     private String password;
 
-    private Boolean isActive;
+    private Boolean isActive = true;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id")
     private Role role;
+
+    private String createdBy;
 }

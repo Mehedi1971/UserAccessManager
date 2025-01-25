@@ -1,16 +1,15 @@
 package com.mahedi.useraccessmanager.controller;
 
+import com.mahedi.useraccessmanager.dto.LoginRequestDto;
+import com.mahedi.useraccessmanager.dto.Response;
+import com.mahedi.useraccessmanager.dto.UserDto;
 import com.mahedi.useraccessmanager.entity.User;
 import com.mahedi.useraccessmanager.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/auth")
@@ -20,19 +19,29 @@ public class AuthController {
 
 
     @PostMapping("/create")
-    public ResponseEntity<User> createUser(@RequestBody User user, Principal principal) {
-        User users = userService.createUser(user, principal.getName());
-        return ResponseEntity.status(HttpStatus.CREATED).body(users);
+    public Response createUser(@RequestBody UserDto userDto, Principal principal) {
+        return userService.createUser(userDto, principal.getName());
     }
 
-//    @PostMapping("/register")
-//    public User register(@RequestBody User user) {
-//        return userService.register(user);
-//    }
 
     @PostMapping("/login")
-    public String login(@RequestBody User user) {
-        return userService.verify(user);
+    public Response login(@RequestBody LoginRequestDto loginRequestDto) {
+        return userService.verify(loginRequestDto);
 
+    }
+
+    @GetMapping("/users")
+    public Response getAllUsers(Principal principal) {
+        return userService.getUsers(principal.getName());
+    }
+
+    @PutMapping("/users/{userId}")
+    public Response updateUser(@PathVariable UUID userId, @RequestBody User userDto, Principal principal) {
+        return userService.updateUser(userId, userDto, principal.getName());
+    }
+
+    @DeleteMapping("/users/{userId}")
+    public Response deleteUser(@PathVariable UUID userId, Principal principal){
+        return userService.deleteUser(userId,principal.getName());
     }
 }

@@ -1,14 +1,11 @@
 package com.mahedi.useraccessmanager.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
-@Setter
-@Getter
+@Data
 @AllArgsConstructor
+@NoArgsConstructor
 @Builder
 public class ErrorResponseDto {
 
