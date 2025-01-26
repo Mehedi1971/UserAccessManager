@@ -10,13 +10,13 @@ import java.util.UUID;
 
 public interface UserService {
 
-    Response createUser(UserDto userDto, String name);
+    Response createUser(UserDto userDto);
 
     Response verify(LoginRequestDto loginRequestDto);
 
-    Response getUsers(String name);
+    Response getUsers();
 
-    Response updateUser(UUID userId, User userDto, String name);
+    Response updateUser(UUID userId, User user);
 
-    Response deleteUser(UUID userId, String name);
+    Response deleteUser(UUID userId);
 }

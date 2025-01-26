@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -53,9 +54,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public Response createUser(UserDto userDto, String creatorUsername) {
+    public Response createUser(UserDto userDto) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+
         User validUser = userMapper.toEntity(userDto);
-        User creator = userRepository.findByUsernameAndIsActive(creatorUsername, true);
+        User creator = userRepository.findByUsernameAndIsActive(currentUsername, true);
 
         if(creator.getId()== null){
             return ResponseBuilder.getFailureResponse(HttpStatus.NOT_FOUND,
@@ -83,7 +86,7 @@ public class UserServiceImpl implements UserService {
         user.setPassword(bCryptPasswordEncoder.encode(validUser.getPassword()));
         user.setIsActive(validUser.getIsActive());
         user.setRole(role);
-        user.setCreatedBy(creatorUsername);
+        user.setCreatedBy(currentUsername);
 
         user= userRepository.save(user);
 
@@ -95,8 +98,10 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public Response getUsers(String name) {
-        User requester = userRepository.findByUsernameAndIsActive(name, true);
+    public Response getUsers() {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        User requester = userRepository.findByUsernameAndIsActive(currentUsername, true);
 
         if (requester.getRole().getName().equalsIgnoreCase("SUPER_ADMIN")) {
             List<User> userList= userRepository.findAllByCreatedByAndIsActive(requester.getUsername(),true);
@@ -109,83 +114,91 @@ public class UserServiceImpl implements UserService {
             return ResponseBuilder.getSuccessResponse(HttpStatus.FOUND,"User Found", userList,userList.size());
         }
 
-        return ResponseBuilder.getFailureResponse(HttpStatus.INTERNAL_SERVER_ERROR,
-                "internal Server Error");
+        return ResponseBuilder.getFailureResponse(HttpStatus.NOT_FOUND,
+                "User Not Found");
     }
 
     @Override
-    public Response updateUser(UUID userId, User userDto, String name) {
-        User requester = userRepository.findByUsernameAndIsActive(name, true);
+    public Response updateUser(UUID userId, User user) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        User requester = userRepository.findByUsernameAndIsActive(currentUsername, true);
+
+        User existingUser = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if(existingUser.getId()==null){
+            return ResponseBuilder.getFailureResponse(HttpStatus.NOT_FOUND,
+                    "User Not Found");
+        }
+
+        if ("SUPER_ADMIN".equalsIgnoreCase(requester.getRole().getName())) {
+            return updateAndSaveUser(existingUser, user);
+        }
+
+        if ("ADMIN".equalsIgnoreCase(requester.getRole().getName())) {
+            if (!"USER".equalsIgnoreCase(existingUser.getRole().getName())) {
+                return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
+                        "Unauthorized. ADMIN can only update USER accounts.");
+            }
+
+            if (!currentUsername.equals(existingUser.getCreatedBy())) {
+                return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
+                        "Unauthorized. ADMIN can only update users they created.");
+            }
+
+            return updateAndSaveUser(existingUser, user);
+        }
+
+        return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
+                "Unauthorized action. Only ADMIN or SUPER_ADMIN can update accounts.");
+    }
+
+    private Response updateAndSaveUser(User existingUser, User user) {
+        existingUser.setFirstname(user.getFirstname());
+        existingUser.setLastname(user.getLastname());
+        existingUser.setIsActive(user.getIsActive());
+
+        if (user.getPassword() != null && !user.getPassword().isEmpty()) {
+            existingUser.setPassword(bCryptPasswordEncoder.encode(user.getPassword()));
+        }
+
+        User updatedUser = userRepository.save(existingUser);
+
+        return ResponseBuilder.getSuccessResponse(HttpStatus.OK, "User updated successfully", updatedUser);
+    }
+
+    @Override
+    public Response deleteUser(UUID userId) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        User requester = userRepository.findByUsernameAndIsActive(currentUsername, true);
 
         User existingUser = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        Role role = roleRepository.findByName(userDto.getRole().getName())
-                .orElseThrow(() -> new RuntimeException("Role not found"));
 
-        if (requester.getId().equals(existingUser.getId()) &&
-                "ADMIN".equalsIgnoreCase(requester.getRole().getName())) {
-            return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
-                    "Admins are not allowed to update their own accounts.");
+        if ("SUPER_ADMIN".equalsIgnoreCase(requester.getRole().getName())) {
+            userRepository.deleteById(userId);
+            return ResponseBuilder.getSuccessResponse(HttpStatus.OK, "User deleted successfully.");
         }
 
-        if (role.getName().equalsIgnoreCase("ADMIN") && !requester.getRole().getName().equalsIgnoreCase("SUPER_ADMIN")) {
-            return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
-                    "Unauthorized. Only SUPER_ADMIN can create ADMIN and USER.");
+        if ("ADMIN".equalsIgnoreCase(requester.getRole().getName())) {
+            if (!"USER".equalsIgnoreCase(existingUser.getRole().getName())) {
+                return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
+                        "Unauthorized. ADMIN can only delete USER accounts.");
+            }
+
+            if (!currentUsername.equals(existingUser.getCreatedBy())) {
+                return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
+                        "Unauthorized. ADMIN can only delete users they created.");
+            }
+
+            userRepository.deleteById(userId);
+            return ResponseBuilder.getSuccessResponse(HttpStatus.OK, "User deleted successfully.");
         }
 
-        if (role.getName().equalsIgnoreCase("USER") &&
-                !(requester.getRole().getName().equalsIgnoreCase("ADMIN") || requester.getRole().getName().equalsIgnoreCase("SUPER_ADMIN"))) {
-            return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
-                    "Unauthorized to create USER accounts.");
-        }
-
-        existingUser.setFirstname(userDto.getFirstname());
-        existingUser.setLastname(userDto.getLastname());
-        existingUser.setIsActive(userDto.getIsActive());
-
-        if (userDto.getPassword() != null && !userDto.getPassword().isEmpty()) {
-            existingUser.setPassword(bCryptPasswordEncoder.encode(userDto.getPassword()));
-        }
-
-        existingUser= userRepository.save(existingUser);
-
-        if(existingUser.getId()!=null){
-            return ResponseBuilder.getSuccessResponse(HttpStatus.CREATED,"User updated", existingUser);
-        }
-        return ResponseBuilder.getFailureResponse(HttpStatus.INTERNAL_SERVER_ERROR,
-                "internal Server Error");
-    }
-
-    @Override
-    public Response deleteUser(UUID userId,String name) {
-        User requester = userRepository.findByUsernameAndIsActive(name, true);
-
-        User existingUser = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        Role role = roleRepository.findByName(existingUser.getRole().getName())
-                .orElseThrow(() -> new RuntimeException("Role not found"));
-
-        if (requester.getId().equals(existingUser.getId()) &&
-                "ADMIN".equalsIgnoreCase(requester.getRole().getName())) {
-            return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
-                    "Admins are not allowed to update their own accounts.");
-        }
-        if (role.getName().equalsIgnoreCase("ADMIN") && !requester.getRole().getName().equalsIgnoreCase("SUPER_ADMIN")) {
-            return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
-                    "Unauthorized. Only SUPER_ADMIN can create ADMIN and USER.");
-        }
-
-        if (role.getName().equalsIgnoreCase("USER") &&
-                !(requester.getRole().getName().equalsIgnoreCase("ADMIN") || requester.getRole().getName().equalsIgnoreCase("SUPER_ADMIN"))) {
-            return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
-                    "Unauthorized to create USER accounts.");
-        }
-
-        userRepository.deleteById(userId);
-
-        return ResponseBuilder.getSuccessResponse(HttpStatus.OK, "User deleted successfully");
+        return ResponseBuilder.getFailureResponse(HttpStatus.UNAUTHORIZED,
+                "Unauthorized action. Only ADMIN or SUPER_ADMIN can delete accounts.");
 
     }
 }
