@@ -11,9 +11,9 @@ Before running the project, ensure you have the following installed:
 
 ### Update the src/main/resources/application.properties file with your database credentials:
 ```->
-spring.datasource.url=jdbc:mysql://<DB_HOST>:<DB_PORT>/<DB_NAME> <br>
-spring.datasource.username=<DB_USERNAME> <br>
-spring.datasource.password=<DB_PASSWORD> <br>
+spring.datasource.url=jdbc:mysql://<DB_HOST>:<DB_PORT>/<DB_NAME>
+spring.datasource.username=<DB_USERNAME>
+spring.datasource.password=<DB_PASSWORD>
 ```
 
 ### Code Build and Run
